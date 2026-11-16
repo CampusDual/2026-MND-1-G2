@@ -1,7 +1,43 @@
-<section class="ok-page">
-  <article class="ok-card">
-    <h1>It works!</h1>
-    <p>Login validado correctamente contra el backend.</p>
-    <button type="button" (click)="logout()">Cerrar sesion</button>
-  </article>
-</section>
+<main class="customer-page">
+  <header><span>Mi camarote · 405</span><button type="button" class="link-button" (click)="logout()">Cerrar sesión</button></header>
+  @if (errorMessage) { <p class="error-message">{{ errorMessage }}</p> }
+
+  @if (screen === 'home') {
+    <section class="card hero"><h1>¡Bienvenido a bordo!</h1><p>¿Qué podemos hacer por ti hoy?</p>
+      <button (click)="start('INCIDENT')">Comunicar una incidencia</button>
+      <button (click)="start('SERVICE')">Realizar una solicitud</button>
+      <button (click)="showRequests()">Mis solicitudes</button>
+    </section>
+  }
+  @if (screen === 'categories') {
+    <section class="card"><button class="back" (click)="home()">← Volver</button><h1>{{ requestType === 'INCIDENT' ? '¿Qué problema tienes en tu camarote?' : '¿Qué necesitas?' }}</h1>
+      @for (category of categories; track category.categoryId) { <button class="option" (click)="selectCategory(category)"><strong>{{ category.name }}</strong><span>{{ category.description }}</span></button> }
+    </section>
+  }
+  @if (screen === 'subcategories') {
+    <section class="card"><button class="back" (click)="screen = 'categories'">← Categorías</button><h1>Selecciona una opción</h1>
+      @for (subcategory of subcategories; track subcategory.subcategoryId) { <button class="option" (click)="selectSubcategory(subcategory)">{{ subcategory.name }}</button> }
+    </section>
+  }
+  @if (screen === 'details') {
+    <section class="card"><button class="back" (click)="screen = 'subcategories'">← Opciones</button><h1>Detalles de la solicitud</h1><p>{{ selectedSubcategory?.name }}</p>
+      <h2>¿Cuántas necesitas?</h2><div class="quantity"><button (click)="changeQuantity(-1)">−</button><strong>{{ quantity }}</strong><button (click)="changeQuantity(1)">+</button></div>
+      <h2>¿Cuándo las necesitas?</h2><label><input type="radio" name="delivery" value="ASAP" [(ngModel)]="preferredDelivery"> Lo antes posible</label><label><input type="radio" name="delivery" value="NEXT_SHIFT" [(ngModel)]="preferredDelivery"> En el próximo turno disponible</label>
+      <button (click)="sendRequest()" [disabled]="isLoading">Enviar solicitud</button>
+    </section>
+  }
+  @if (screen === 'confirmation') {
+    <section class="card hero"><h1>¡Tu petición ha sido enviada!</h1><p>Podrás consultar su estado desde «Mis solicitudes».</p><p>{{ selectedSubcategory?.name }} · Camarote 405</p><button (click)="home()">Volver al inicio</button><button (click)="showRequests()">Mis solicitudes</button></section>
+  }
+  @if (screen === 'requests') {
+    <section class="card"><button class="back" (click)="home()">← Inicio</button><h1>Mis solicitudes</h1>
+      @for (request of requests; track request.serviceRequestId) { <button class="option" (click)="showRequest(request)"><strong>{{ request.subcategory.name }}</strong><span>{{ request.createdAt | date:'short' }} · {{ statusLabel(request.status) }}</span></button> }
+      @if (requests.length === 0) { <p>Aún no tienes solicitudes.</p> }
+    </section>
+  }
+  @if (screen === 'request-detail' && selectedRequest) {
+    <section class="card"><button class="back" (click)="showRequests()">← Mis solicitudes</button><h1>Detalle de la petición</h1><p><strong>{{ selectedRequest.subcategory.name }}</strong></p><p>Camarote: {{ selectedRequest.cabinNumber }}</p><p>Estado: <strong>{{ statusLabel(selectedRequest.status) }}</strong></p><p>Creada: {{ selectedRequest.createdAt | date:'short' }}</p>
+      <h2>Historial</h2>@for (history of selectedRequest.statusHistory; track history.changedAt) { <p>{{ statusLabel(history.newStatus) }} · {{ history.changedAt | date:'short' }}</p> }
+    </section>
+  }
+</main>

@@ -165,6 +165,99 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/categories:
+    get:
+      tags: [Requests]
+      summary: Consulta las categorías activas del catálogo
+      parameters:
+        - in: query
+          name: type
+          required: true
+          schema:
+            type: string
+            enum: [INCIDENT, SERVICE]
+      responses:
+        '200':
+          description: Categorías del catálogo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RequestCategoryDto'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/categories/{categoryId}/subcategories:
+    get:
+      tags: [Requests]
+      summary: Consulta las subcategorías de una categoría
+      parameters:
+        - in: path
+          name: categoryId
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      responses:
+        '200':
+          description: Subcategorías activas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RequestSubcategoryDto'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/requests:
+    get:
+      tags: [Requests]
+      summary: Lista las solicitudes del camarote ficticio
+      responses:
+        '200':
+          description: Solicitudes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ServiceRequestDto' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [Requests]
+      summary: Crea una incidencia o solicitud
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceRequestCreateDto' }
+      responses:
+        '201':
+          description: Solicitud creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceRequestDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/requests/{id}:
+    get:
+      tags: [Requests]
+      summary: Consulta el detalle de una solicitud
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      responses:
+        '200':
+          description: Detalle de solicitud
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceRequestDto' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 components:
   securitySchemes:
     basicAuth:
@@ -316,3 +409,55 @@ components:
           description: Detalle opcional de errores de validacion por campo.
           items:
             $ref: '#/components/schemas/ValidationErrorItem'
+    RequestSubcategoryDto:
+      type: object
+      required: [subcategoryId, categoryId, name, description, icon, active]
+      properties:
+        subcategoryId: { type: integer, format: int64 }
+        categoryId: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string }
+        icon: { type: string }
+        active: { type: boolean }
+    RequestCategoryDto:
+      type: object
+      required: [categoryId, name, type, description, icon, active, subcategories]
+      properties:
+        categoryId: { type: integer, format: int64 }
+        name: { type: string }
+        type: { type: string, enum: [INCIDENT, SERVICE] }
+        description: { type: string }
+        icon: { type: string }
+        active: { type: boolean }
+        subcategories:
+          type: array
+          items: { $ref: '#/components/schemas/RequestSubcategoryDto' }
+    ServiceRequestCreateDto:
+      type: object
+      required: [categoryId, subcategoryId]
+      properties:
+        categoryId: { type: integer, format: int64, minimum: 1 }
+        subcategoryId: { type: integer, format: int64, minimum: 1 }
+        quantity: { type: integer, minimum: 1 }
+        preferredDelivery: { type: string, enum: [ASAP, NEXT_SHIFT] }
+    ServiceRequestDto:
+      type: object
+      properties:
+        serviceRequestId: { type: integer, format: int64 }
+        cabinNumber: { type: integer }
+        category: { $ref: '#/components/schemas/RequestCategoryDto' }
+        subcategory: { $ref: '#/components/schemas/RequestSubcategoryDto' }
+        quantity: { type: integer, minimum: 1, nullable: true }
+        preferredDelivery: { type: string, nullable: true }
+        status: { type: string, enum: [PENDING, ASSIGNED, IN_PROGRESS, RESOLVED] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        statusHistory:
+          type: array
+          items: { $ref: '#/components/schemas/RequestStatusHistoryDto' }
+    RequestStatusHistoryDto:
+      type: object
+      properties:
+        previousStatus: { type: string, nullable: true }
+        newStatus: { type: string }
+        changedAt: { type: string, format: date-time }
