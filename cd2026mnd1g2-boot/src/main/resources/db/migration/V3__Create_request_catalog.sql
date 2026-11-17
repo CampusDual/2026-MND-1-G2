@@ -67,8 +67,7 @@ INSERT INTO request_categories (name, type, description, icon, active) VALUES
 ('Limpieza', 'SERVICE', 'Servicios de limpieza adicionales', 'cleaning', TRUE),
 ('Otros artÃ­culos', 'SERVICE', 'ArtÃ­culos disponibles a bordo', 'other', TRUE);
 
-INSERT INTO request_subcategories (category_id, name, description, icon, active)
-SELECT category_id, 'No sale agua.', 'No sale agua.', 'water', TRUE FROM request_categories WHERE name = 'Agua y baÃ±o' AND type = 'INCIDENT';
+INSERT INTO request_subcategories (category_id, name, description, icon, active) SELECT category_id, 'No sale agua.', 'No sale agua.', 'water', TRUE FROM request_categories WHERE name = 'Agua y baÃ±o' AND type = 'INCIDENT';
 INSERT INTO request_subcategories (category_id, name, description, icon, active) SELECT category_id, 'No hay agua caliente.', 'No hay agua caliente.', 'water', TRUE FROM request_categories WHERE name = 'Agua y baÃ±o' AND type = 'INCIDENT';
 INSERT INTO request_subcategories (category_id, name, description, icon, active) SELECT category_id, 'El grifo pierde agua.', 'El grifo pierde agua.', 'water', TRUE FROM request_categories WHERE name = 'Agua y baÃ±o' AND type = 'INCIDENT';
 INSERT INTO request_subcategories (category_id, name, description, icon, active) SELECT category_id, 'Hay una fuga.', 'Hay una fuga.', 'water', TRUE FROM request_categories WHERE name = 'Agua y baÃ±o' AND type = 'INCIDENT';
