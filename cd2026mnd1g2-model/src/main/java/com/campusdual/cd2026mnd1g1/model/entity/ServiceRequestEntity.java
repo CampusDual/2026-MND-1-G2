@@ -21,6 +21,8 @@ public class ServiceRequestEntity {
     @Column(nullable = false) private String status;
     @Column(nullable = false) private LocalDateTime createdAt;
     @Column(nullable = false) private LocalDateTime updatedAt;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "worker_id", nullable = true)
+    private WorkerEntity worker;
     @OneToMany(mappedBy = "serviceRequest", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<RequestStatusHistoryEntity> statusHistory = new ArrayList<>();
     public Long getServiceRequestId() { return serviceRequestId; }
@@ -40,5 +42,7 @@ public class ServiceRequestEntity {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public WorkerEntity getWorker() { return worker; }
+    public void setWorker(WorkerEntity worker) { this.worker = worker; }
     public List<RequestStatusHistoryEntity> getStatusHistory() { return statusHistory; }
 }
