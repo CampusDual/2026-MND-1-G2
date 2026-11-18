@@ -1,0 +1,108 @@
+<main class="workers-page">
+  <header class="workers-header">
+    <div>
+      <span class="ship-name">CRUCERO</span>
+      <strong>TRABAJADORES</strong>
+    </div>
+    <nav>
+      <button type="button" class="header-link" (click)="backToCabin()">Mi camarote</button>
+      <button type="button" class="header-link" (click)="logout()">Cerrar sesión</button>
+    </nav>
+  </header>
+
+  @if (errorMessage) { <p class="error-message">{{ errorMessage }}</p> }
+
+  @if (!department) {
+    <section class="department-selection">
+      <h1>Selecciona tu departamento</h1>
+      <div class="department-grid">
+        <article class="department-card housekeeping">
+          <span class="department-icon">H</span>
+          <h2>HOUSEKEEPING</h2>
+          <ul>
+            <li>Limpieza de camarotes.</li>
+            <li>Toallas.</li>
+            <li>Ropa de cama.</li>
+            <li>Amenities.</li>
+          </ul>
+          <button type="button" (click)="enterDepartment('HOUSEKEEPING')">ENTRAR</button>
+        </article>
+        <article class="department-card maintenance">
+          <span class="department-icon">M</span>
+          <h2>MANTENIMIENTO</h2>
+          <ul>
+            <li>Averías de agua.</li>
+            <li>Electricidad.</li>
+            <li>Climatización.</li>
+            <li>Mobiliario.</li>
+          </ul>
+          <button type="button" (click)="enterDepartment('MANTENIMIENTO')">ENTRAR</button>
+        </article>
+      </div>
+    </section>
+  } @else {
+    <section class="department-board">
+      <div class="board-heading">
+        <button type="button" class="back-button" (click)="backToDepartments()">← Departamentos</button>
+        <h1>{{ department === 'HOUSEKEEPING' ? 'HOUSEKEEPING' : 'MANTENIMIENTO' }}</h1>
+      </div>
+
+      <div class="counters">
+        <article class="counter pending"><strong>{{ unassigned.length }}</strong><span>Sin asignar</span></article>
+        <article class="counter assigned"><strong>{{ assigned.length }}</strong><span>Asignadas</span></article>
+        <article class="counter resolved"><strong>{{ resolved.length }}</strong><span>Finalizadas</span></article>
+      </div>
+
+      @if (isLoading) { <p class="loading">Cargando solicitudes...</p> }
+
+      <div class="task-grid">
+        <section class="task-column">
+          <h2>TAREAS SIN ASIGNAR</h2>
+          @for (request of unassigned; track request.serviceRequestId) {
+            <article class="task-card">
+              <div><span class="label">Camarote</span><strong>{{ request.cabinNumber }}</strong></div>
+              <h3>{{ request.itemName }}</h3>
+              @if (request.quantity != null) { <p>Cantidad: {{ request.quantity }}</p> }
+              <button type="button" class="assign-button" (click)="assign(request)">ASIGNÁRMELA</button>
+            </article>
+          }
+          @if (!isLoading && unassigned.length === 0) { <p class="empty">No hay tareas pendientes.</p> }
+        </section>
+
+        <section class="task-column">
+          <h2>MIS TAREAS ASIGNADAS</h2>
+          @for (request of assigned; track request.serviceRequestId) {
+            <article class="task-card">
+              <div><span class="label">Camarote</span><strong>{{ request.cabinNumber }}</strong></div>
+              <h3>{{ request.itemName }}</h3>
+              @if (request.quantity != null) { <p>Cantidad: {{ request.quantity }}</p> }
+              <span class="status" [class.status-progress]="request.status === 'IN_PROGRESS'" [class.status-assigned]="request.status === 'ASSIGNED'">
+                {{ statusLabel(request.status) }}
+              </span>
+              @if (request.status === 'ASSIGNED') {
+                <button type="button" class="start-button" (click)="start(request)">INICIAR</button>
+              }
+              @if (request.status === 'IN_PROGRESS') {
+                <button type="button" class="resolve-button" (click)="resolve(request)">FINALIZAR</button>
+              }
+            </article>
+          }
+          @if (!isLoading && assigned.length === 0) { <p class="empty">No tienes tareas asignadas.</p> }
+        </section>
+
+        <section class="task-column">
+          <h2>TAREAS FINALIZADAS</h2>
+          @for (request of resolved; track request.serviceRequestId) {
+            <article class="task-card resolved-card">
+              <div><span class="label">Camarote</span><strong>{{ request.cabinNumber }}</strong></div>
+              <h3>{{ request.itemName }}</h3>
+              @if (request.quantity != null) { <p>Cantidad: {{ request.quantity }}</p> }
+              <span class="status status-resolved">Finalizada</span>
+            </article>
+          }
+          @if (!isLoading && resolved.length === 0) { <p class="empty">No hay tareas finalizadas.</p> }
+        </section>
+      </div>
+    </section>
+  }
+</main>

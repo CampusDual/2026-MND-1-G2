@@ -258,6 +258,143 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/worker-requests/unassigned:
+    get:
+      tags: [Workers]
+      summary: Lista solicitudes pendientes sin asignar por departamento
+      parameters:
+        - in: query
+          name: department
+          required: true
+          schema:
+            type: string
+            enum: [HOUSEKEEPING, MANTENIMIENTO]
+      responses:
+        '200':
+          description: Solicitudes pendientes sin asignar
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WorkerRequestDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/worker-requests/assigned:
+    get:
+      tags: [Workers]
+      summary: Lista las solicitudes asignadas al trabajador autenticado
+      parameters:
+        - in: query
+          name: department
+          required: true
+          schema: { type: string, enum: [HOUSEKEEPING, MANTENIMIENTO] }
+      responses:
+        '200':
+          description: Solicitudes asignadas o en curso
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WorkerRequestDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/worker-requests/resolved:
+    get:
+      tags: [Workers]
+      summary: Lista las solicitudes finalizadas del trabajador autenticado
+      parameters:
+        - in: query
+          name: department
+          required: true
+          schema: { type: string, enum: [HOUSEKEEPING, MANTENIMIENTO] }
+      responses:
+        '200':
+          description: Solicitudes finalizadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WorkerRequestDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/worker-requests/{id}/assign:
+    post:
+      tags: [Workers]
+      summary: Asigna una solicitud al trabajador autenticado
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+        - in: query
+          name: department
+          required: true
+          schema: { type: string, enum: [HOUSEKEEPING, MANTENIMIENTO] }
+      responses:
+        '200':
+          description: Solicitud asignada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkerRequestDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/worker-requests/{id}/start:
+    post:
+      tags: [Workers]
+      summary: Inicia una solicitud asignada
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+        - in: query
+          name: department
+          required: true
+          schema: { type: string, enum: [HOUSEKEEPING, MANTENIMIENTO] }
+      responses:
+        '200':
+          description: Solicitud en curso
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkerRequestDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/worker-requests/{id}/resolve:
+    post:
+      tags: [Workers]
+      summary: Finaliza una solicitud en curso
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+        - in: query
+          name: department
+          required: true
+          schema: { type: string, enum: [HOUSEKEEPING, MANTENIMIENTO] }
+      responses:
+        '200':
+          description: Solicitud finalizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkerRequestDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 components:
   securitySchemes:
     basicAuth:
@@ -307,6 +444,15 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    WorkerRequestDto:
+      type: object
+      required: [serviceRequestId, cabinNumber, itemName, status]
+      properties:
+        serviceRequestId: { type: integer, format: int64, minimum: 1 }
+        cabinNumber: { type: integer, minimum: 1 }
+        itemName: { type: string, minLength: 1 }
+        quantity: { type: integer, minimum: 1, nullable: true }
+        status: { type: string, enum: [PENDING, ASSIGNED, IN_PROGRESS, RESOLVED] }
     UserDto:
       type: object
       required:

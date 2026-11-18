@@ -42,6 +42,16 @@ export interface ServiceRequestCreate {
   preferredDelivery: string | null;
 }
 
+export type WorkerDepartment = 'HOUSEKEEPING' | 'MANTENIMIENTO';
+
+export interface WorkerRequest {
+  serviceRequestId: number;
+  cabinNumber: number;
+  itemName: string;
+  quantity: number | null;
+  status: 'PENDING' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED';
+}
+
 @Injectable({ providedIn: 'root' })
 export class RequestService {
   constructor(private readonly http: HttpClient, private readonly authService: AuthService) {}
@@ -60,6 +70,45 @@ export class RequestService {
 
   getRequest(id: number): Observable<ServiceRequest> {
     return this.http.get<ServiceRequest>(`/api/requests/${id}`, { headers: this.headers() });
+  }
+
+  getUnassignedWorkerRequests(department: WorkerDepartment): Observable<WorkerRequest[]> {
+    return this.http.get<WorkerRequest[]>(
+      `/api/worker-requests/unassigned?department=${department}`,
+      { headers: this.headers() });
+  }
+
+  getAssignedWorkerRequests(department: WorkerDepartment): Observable<WorkerRequest[]> {
+    return this.http.get<WorkerRequest[]>(
+      `/api/worker-requests/assigned?department=${department}`,
+      { headers: this.headers() });
+  }
+
+  getResolvedWorkerRequests(department: WorkerDepartment): Observable<WorkerRequest[]> {
+    return this.http.get<WorkerRequest[]>(
+      `/api/worker-requests/resolved?department=${department}`,
+      { headers: this.headers() });
+  }
+
+  assignWorkerRequest(requestId: number, department: WorkerDepartment): Observable<WorkerRequest> {
+    return this.http.post<WorkerRequest>(
+      `/api/worker-requests/${requestId}/assign?department=${department}`,
+      {},
+      { headers: this.headers() });
+  }
+
+  startWorkerRequest(requestId: number, department: WorkerDepartment): Observable<WorkerRequest> {
+    return this.http.post<WorkerRequest>(
+      `/api/worker-requests/${requestId}/start?department=${department}`,
+      {},
+      { headers: this.headers() });
+  }
+
+  resolveWorkerRequest(requestId: number, department: WorkerDepartment): Observable<WorkerRequest> {
+    return this.http.post<WorkerRequest>(
+      `/api/worker-requests/${requestId}/resolve?department=${department}`,
+      {},
+      { headers: this.headers() });
   }
 
   private headers(): HttpHeaders {

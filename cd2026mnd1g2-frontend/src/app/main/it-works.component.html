@@ -1,5 +1,11 @@
 <main class="customer-page">
-  <header><span>Mi camarote · 405</span><button type="button" class="link-button" (click)="logout()">Cerrar sesión</button></header>
+  <header>
+    <span>Mi camarote · 405</span>
+    <div>
+      <button type="button" class="link-button" (click)="goToWorkers()">Trabajadores</button>
+      <button type="button" class="link-button" (click)="logout()">Cerrar sesión</button>
+    </div>
+  </header>
   @if (errorMessage) { <p class="error-message">{{ errorMessage }}</p> }
 
   @if (screen === 'home') {

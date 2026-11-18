@@ -1,0 +1,48 @@
+:host { display: block; min-height: 100vh; background: #edf3f7; color: #17324d; }
+.workers-page { min-height: 100vh; }
+.workers-header { height: 72px; padding: 0 5%; display: flex; align-items: center; justify-content: space-between; background: #102d4f; color: white; }
+.workers-header div { display: flex; flex-direction: column; }
+.ship-name { font-size: .7rem; letter-spacing: .18rem; opacity: .75; }
+.workers-header nav { display: flex; gap: .5rem; }
+.header-link { border: 0; background: transparent; color: white; cursor: pointer; font-weight: 700; }
+.department-selection { max-width: 980px; margin: 0 auto; padding: 64px 24px; text-align: center; }
+.department-selection h1 { margin-bottom: 32px; }
+.department-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.department-card { min-height: 330px; padding: 28px; border-radius: 18px; background: white; box-shadow: 0 10px 30px rgba(23, 50, 77, .12); }
+.department-card h2 { margin: 12px 0 18px; }
+.department-card ul { min-height: 130px; text-align: left; line-height: 1.9; }
+.department-icon { width: 48px; height: 48px; display: inline-grid; place-items: center; border-radius: 50%; color: white; font-weight: 800; }
+.housekeeping .department-icon, .housekeeping button { background: #1677a8; }
+.maintenance .department-icon, .maintenance button { background: #e67e22; }
+.department-card button { width: 100%; border: 0; border-radius: 10px; color: white; padding: 14px; font-weight: 800; cursor: pointer; }
+.department-board { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
+.board-heading { display: flex; align-items: center; gap: 18px; }
+.back-button { border: 0; background: transparent; color: #1677a8; cursor: pointer; font-weight: 700; }
+.counters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0 26px; }
+.counter { display: flex; flex-direction: column; align-items: center; padding: 18px; border-radius: 14px; background: white; box-shadow: 0 4px 14px rgba(23, 50, 77, .08); }
+.counter strong { font-size: 2rem; }
+.counter.pending strong { color: #d64545; }
+.counter.assigned strong { color: #1677a8; }
+.counter.resolved strong { color: #718096; }
+.task-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.task-column { border-radius: 14px; background: #e4edf3; padding: 14px; min-height: 250px; }
+.task-column h2 { font-size: .9rem; text-align: center; }
+.task-card { margin-top: 12px; padding: 16px; border-radius: 12px; background: white; box-shadow: 0 3px 10px rgba(23, 50, 77, .08); }
+.task-card div { display: flex; justify-content: space-between; }
+.task-card h3 { margin: 12px 0 6px; font-size: 1rem; }
+.task-card p { margin: 4px 0 12px; }
+.label { color: #718096; font-size: .8rem; }
+.task-card button { width: 100%; margin-top: 12px; border: 0; border-radius: 8px; padding: 10px; color: white; font-weight: 800; cursor: pointer; }
+.assign-button { background: #1677a8; }
+.start-button { background: #1677a8; }
+.resolve-button { background: #3f9b68; }
+.status { display: inline-block; margin-top: 4px; border-radius: 999px; padding: 5px 9px; font-size: .78rem; font-weight: 800; }
+.status-assigned { background: #fde2b3; color: #8a4a00; }
+.status-progress { background: #d8f3e4; color: #287247; }
+.status-resolved { background: #e5e7eb; color: #5f6875; }
+.empty, .loading { text-align: center; color: #718096; }
+.error-message { margin: 12px 5%; border-radius: 8px; padding: 10px; background: #fee2e2; color: #9b1c1c; }
+@media (max-width: 900px) {
+  .department-grid, .task-grid { grid-template-columns: 1fr; }
+  .counters { grid-template-columns: repeat(3, 1fr); }
+}

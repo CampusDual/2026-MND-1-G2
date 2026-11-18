@@ -4,6 +4,7 @@ import com.campusdual.cd2026mnd1g1.api.dto.RequestCategoryDto;
 import com.campusdual.cd2026mnd1g1.api.dto.RequestSubcategoryDto;
 import com.campusdual.cd2026mnd1g1.api.dto.ServiceRequestCreateDto;
 import com.campusdual.cd2026mnd1g1.api.dto.ServiceRequestDto;
+import com.campusdual.cd2026mnd1g1.api.dto.WorkerRequestDto;
 
 import java.util.List;
 
@@ -18,4 +19,16 @@ public interface RequestService {
     List<ServiceRequestDto> findAll();
 
     ServiceRequestDto findById(Long id);
+
+    List<WorkerRequestDto> findUnassignedByDepartment(String department);
+
+    List<WorkerRequestDto> findAssignedByDepartment(String department, String username);
+
+    List<WorkerRequestDto> findResolvedByDepartment(String department, String username);
+
+    WorkerRequestDto assign(Long requestId, String department, String username);
+
+    WorkerRequestDto start(Long requestId, String department, String username);
+
+    WorkerRequestDto resolve(Long requestId, String department, String username);
 }

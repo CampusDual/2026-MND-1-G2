@@ -102,6 +102,10 @@ export class ItWorksComponent {
     this.selectedSubcategory = null;
   }
 
+  goToWorkers(): void {
+    this.router.navigate(['/workers']);
+  }
+
   statusLabel(status: string): string {
     const labels: Record<string, string> = {
       PENDING: 'Pendiente',

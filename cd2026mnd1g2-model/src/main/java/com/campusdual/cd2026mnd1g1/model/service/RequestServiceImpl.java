@@ -4,6 +4,8 @@ import com.campusdual.cd2026mnd1g1.api.dto.*;
 import com.campusdual.cd2026mnd1g1.api.service.RequestService;
 import com.campusdual.cd2026mnd1g1.model.entity.*;
 import com.campusdual.cd2026mnd1g1.model.exception.ServiceRequestNotFoundException;
+import com.campusdual.cd2026mnd1g1.model.exception.WorkerNotFoundException;
+import com.campusdual.cd2026mnd1g1.model.exception.RequestConflictException;
 import com.campusdual.cd2026mnd1g1.model.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,13 +22,16 @@ public class RequestServiceImpl implements RequestService {
     private final RequestCategoryRepository categoryRepository;
     private final RequestSubcategoryRepository subcategoryRepository;
     private final ServiceRequestRepository requestRepository;
+    private final WorkerRepository workerRepository;
 
     public RequestServiceImpl(CabinRepository cabinRepository, RequestCategoryRepository categoryRepository,
-                              RequestSubcategoryRepository subcategoryRepository, ServiceRequestRepository requestRepository) {
+                              RequestSubcategoryRepository subcategoryRepository, ServiceRequestRepository requestRepository,
+                              WorkerRepository workerRepository) {
         this.cabinRepository = cabinRepository;
         this.categoryRepository = categoryRepository;
         this.subcategoryRepository = subcategoryRepository;
         this.requestRepository = requestRepository;
+        this.workerRepository = workerRepository;
     }
 
     @Override
@@ -72,7 +77,7 @@ public class RequestServiceImpl implements RequestService {
     @Override
     public List<ServiceRequestDto> findAll() {
         return requestRepository.findByCabinCabinNumberOrderByCreatedAtDesc(DEMO_CABIN_NUMBER).stream()
-                .map(this::advanceDemoStatus).map(this::mapRequest).toList();
+                .map(this::mapRequest).toList();
     }
 
     @Override
@@ -81,7 +86,78 @@ public class RequestServiceImpl implements RequestService {
         ServiceRequestEntity request = requestRepository.findById(id)
                 .filter(r -> DEMO_CABIN_NUMBER.equals(r.getCabin().getCabinNumber()))
                 .orElseThrow(() -> new ServiceRequestNotFoundException(id));
-        return mapRequest(advanceDemoStatus(request));
+        return mapRequest(request);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WorkerRequestDto> findUnassignedByDepartment(String department) {
+        validateDepartment(department);
+        return requestRepository.findUnassignedByDepartment(department).stream()
+                .map(this::mapWorkerRequest).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WorkerRequestDto> findAssignedByDepartment(String department, String username) {
+        validateDepartment(department);
+        WorkerEntity worker = findWorker(username);
+        return requestRepository.findAssignedByDepartmentAndWorker(department, worker.getWorkerId()).stream()
+                .map(this::mapWorkerRequest).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WorkerRequestDto> findResolvedByDepartment(String department, String username) {
+        validateDepartment(department);
+        WorkerEntity worker = findWorker(username);
+        return requestRepository.findResolvedByDepartmentAndWorker(department, worker.getWorkerId()).stream()
+                .map(this::mapWorkerRequest).toList();
+    }
+
+    @Override
+    public WorkerRequestDto assign(Long requestId, String department, String username) {
+        validateDepartment(department);
+        WorkerEntity worker = findWorker(username);
+        ServiceRequestEntity request = requestRepository.findByIdForUpdate(requestId)
+                .orElseThrow(() -> new ServiceRequestNotFoundException(requestId));
+        validateDepartmentOfRequest(request, department);
+        if (!PENDING.equals(request.getStatus()) || request.getWorker() != null) {
+            throw new RequestConflictException("La solicitud ya ha sido asignada o no esta pendiente");
+        }
+        transition(request, "ASSIGNED");
+        request.setWorker(worker);
+        return mapWorkerRequest(requestRepository.save(request));
+    }
+
+    @Override
+    public WorkerRequestDto start(Long requestId, String department, String username) {
+        validateDepartment(department);
+        WorkerEntity worker = findWorker(username);
+        ServiceRequestEntity request = requestRepository.findByIdForUpdate(requestId)
+                .orElseThrow(() -> new ServiceRequestNotFoundException(requestId));
+        validateDepartmentOfRequest(request, department);
+        validateWorker(request, worker);
+        if (!"ASSIGNED".equals(request.getStatus())) {
+            throw new RequestConflictException("La solicitud debe estar asignada antes de iniciarse");
+        }
+        transition(request, "IN_PROGRESS");
+        return mapWorkerRequest(requestRepository.save(request));
+    }
+
+    @Override
+    public WorkerRequestDto resolve(Long requestId, String department, String username) {
+        validateDepartment(department);
+        WorkerEntity worker = findWorker(username);
+        ServiceRequestEntity request = requestRepository.findByIdForUpdate(requestId)
+                .orElseThrow(() -> new ServiceRequestNotFoundException(requestId));
+        validateDepartmentOfRequest(request, department);
+        validateWorker(request, worker);
+        if (!"IN_PROGRESS".equals(request.getStatus())) {
+            throw new RequestConflictException("La solicitud debe estar en curso antes de finalizarse");
+        }
+        transition(request, "RESOLVED");
+        return mapWorkerRequest(requestRepository.save(request));
     }
 
     private RequestCategoryDto mapCategory(RequestCategoryEntity category) {
@@ -91,14 +167,7 @@ public class RequestServiceImpl implements RequestService {
                 category.getIcon(), category.getActive(), subcategories);
     }
 
-    private ServiceRequestEntity advanceDemoStatus(ServiceRequestEntity request) {
-        String nextStatus = switch (request.getStatus()) {
-            case "PENDING" -> "ASSIGNED";
-            case "ASSIGNED" -> "IN_PROGRESS";
-            case "IN_PROGRESS" -> "RESOLVED";
-            default -> null;
-        };
-        if (nextStatus == null) return request;
+    private void transition(ServiceRequestEntity request, String nextStatus) {
         LocalDateTime now = LocalDateTime.now();
         RequestStatusHistoryEntity history = new RequestStatusHistoryEntity();
         history.setServiceRequest(request);
@@ -108,7 +177,6 @@ public class RequestServiceImpl implements RequestService {
         request.getStatusHistory().add(history);
         request.setStatus(nextStatus);
         request.setUpdatedAt(now);
-        return requestRepository.save(request);
     }
     private RequestSubcategoryDto mapSubcategory(RequestSubcategoryEntity subcategory) {
         return new RequestSubcategoryDto(subcategory.getSubcategoryId(), subcategory.getCategory().getCategoryId(),
@@ -119,5 +187,53 @@ public class RequestServiceImpl implements RequestService {
                 mapSubcategory(request.getSubcategory()), request.getQuantity(), request.getPreferredDelivery(), request.getStatus(),
                 request.getCreatedAt(), request.getUpdatedAt(), request.getStatusHistory().stream()
                         .map(h -> new RequestStatusHistoryDto(h.getPreviousStatus(), h.getNewStatus(), h.getChangedAt())).toList());
+    }
+
+    private WorkerRequestDto mapWorkerRequest(ServiceRequestEntity request) {
+        return new WorkerRequestDto(
+                request.getServiceRequestId(),
+                request.getCabin().getCabinNumber(),
+                request.getSubcategory().getName(),
+                request.getQuantity(),
+                request.getStatus());
+    }
+
+    private WorkerEntity findWorker(String username) {
+        if (username == null || username.isBlank()) {
+            throw new WorkerNotFoundException("desconocido");
+        }
+        return workerRepository.findByUserUsername(username)
+                .orElseThrow(() -> new WorkerNotFoundException(username));
+    }
+
+    private void validateDepartment(String department) {
+        if (!"HOUSEKEEPING".equals(department) && !"MANTENIMIENTO".equals(department)) {
+            throw new IllegalArgumentException("Departamento no valido");
+        }
+    }
+
+    private void validateDepartmentOfRequest(ServiceRequestEntity request, String department) {
+        if (!department.equals(getDepartment(request))) {
+            throw new IllegalArgumentException("La solicitud no pertenece al departamento indicado");
+        }
+    }
+
+    private void validateWorker(ServiceRequestEntity request, WorkerEntity worker) {
+        if (request.getWorker() == null
+                || !Objects.equals(request.getWorker().getWorkerId(), worker.getWorkerId())) {
+            throw new RequestConflictException("La solicitud esta asignada a otro trabajador");
+        }
+    }
+
+    private String getDepartment(ServiceRequestEntity request) {
+        RequestCategoryEntity category = request.getCategory();
+        if ("SERVICE".equals(category.getType())
+                || ("INCIDENT".equals(category.getType()) && "Limpieza".equals(category.getName()))) {
+            return "HOUSEKEEPING";
+        }
+        if ("INCIDENT".equals(category.getType())) {
+            return "MANTENIMIENTO";
+        }
+        throw new IllegalArgumentException("La categoria no pertenece a un departamento de trabajadores");
     }
 }
