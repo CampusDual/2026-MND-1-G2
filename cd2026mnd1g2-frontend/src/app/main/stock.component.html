@@ -1,0 +1,47 @@
+<main class="stock-page">
+  <header class="stock-header">
+    <div>
+      <span class="ship-name">CRUCERO</span>
+      <strong>TRABAJADORES</strong>
+    </div>
+    <nav>
+      <button type="button" class="header-link" (click)="backToWorkers()">Trabajadores</button>
+      <button type="button" class="header-link" (click)="logout()">Cerrar sesión</button>
+    </nav>
+  </header>
+
+  <section class="stock-content">
+    <h1>Stock</h1>
+
+    @if (errorMessage) { <p class="error-message">{{ errorMessage }}</p> }
+
+    <article class="summary-card">
+      <span>Productos diferentes</span>
+      <strong>{{ differentProducts }}</strong>
+    </article>
+
+    @if (isLoading) { <p class="loading">Cargando stock...</p> }
+
+    @if (!isLoading) {
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Unidades disponibles</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (product of products; track product.name) {
+              <tr>
+                <td>{{ product.name }}</td>
+                <td>{{ product.uds }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        @if (products.length === 0) { <p class="empty">No hay productos en stock</p> }
+      </div>
+    }
+  </section>
+</main>

@@ -6,32 +6,37 @@ import com.campusdual.cd2026mnd1g1.model.entity.*;
 import com.campusdual.cd2026mnd1g1.model.exception.ServiceRequestNotFoundException;
 import com.campusdual.cd2026mnd1g1.model.exception.WorkerNotFoundException;
 import com.campusdual.cd2026mnd1g1.model.exception.RequestConflictException;
+import com.campusdual.cd2026mnd1g1.model.exception.StockInsufficientException;
 import com.campusdual.cd2026mnd1g1.model.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 @Transactional
 public class RequestServiceImpl implements RequestService {
     private static final Integer DEMO_CABIN_NUMBER = 405;
     private static final String PENDING = "PENDING";
+    private static final String ASSIGNED = "ASSIGNED";
     private final CabinRepository cabinRepository;
     private final RequestCategoryRepository categoryRepository;
     private final RequestSubcategoryRepository subcategoryRepository;
     private final ServiceRequestRepository requestRepository;
     private final WorkerRepository workerRepository;
+    private final StockRepository stockRepository;
 
     public RequestServiceImpl(CabinRepository cabinRepository, RequestCategoryRepository categoryRepository,
                               RequestSubcategoryRepository subcategoryRepository, ServiceRequestRepository requestRepository,
-                              WorkerRepository workerRepository) {
+                              WorkerRepository workerRepository, StockRepository stockRepository) {
         this.cabinRepository = cabinRepository;
         this.categoryRepository = categoryRepository;
         this.subcategoryRepository = subcategoryRepository;
         this.requestRepository = requestRepository;
         this.workerRepository = workerRepository;
+        this.stockRepository = stockRepository;
     }
 
     @Override
@@ -125,8 +130,9 @@ public class RequestServiceImpl implements RequestService {
         if (!PENDING.equals(request.getStatus()) || request.getWorker() != null) {
             throw new RequestConflictException("La solicitud ya ha sido asignada o no esta pendiente");
         }
-        transition(request, "ASSIGNED");
+        decrementStockForAssignment(request);
         request.setWorker(worker);
+        transition(request, ASSIGNED);
         return mapWorkerRequest(requestRepository.save(request));
     }
 
@@ -177,6 +183,28 @@ public class RequestServiceImpl implements RequestService {
         request.getStatusHistory().add(history);
         request.setStatus(nextStatus);
         request.setUpdatedAt(now);
+    }
+
+    private void decrementStockForAssignment(ServiceRequestEntity request) {
+        if (request.getQuantity() == null || request.getQuantity() < 1) {
+            return;
+        }
+
+        Long subcategoryId = request.getSubcategory().getSubcategoryId();
+        Optional<StockEntity> stock =
+                stockRepository.findBySubcategorySubcategoryIdForUpdate(subcategoryId);
+        if (stock.isEmpty()) {
+            return;
+        }
+
+        StockEntity product = stock.get();
+        int available = product.getUds();
+        if (available < request.getQuantity()) {
+            throw new StockInsufficientException(
+                    product.getName(), available, request.getQuantity());
+        }
+        product.setUds(available - request.getQuantity());
+        stockRepository.save(product);
     }
     private RequestSubcategoryDto mapSubcategory(RequestSubcategoryEntity subcategory) {
         return new RequestSubcategoryDto(subcategory.getSubcategoryId(), subcategory.getCategory().getCategoryId(),

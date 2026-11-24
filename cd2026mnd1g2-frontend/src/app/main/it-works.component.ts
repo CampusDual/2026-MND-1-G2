@@ -106,6 +106,10 @@ export class ItWorksComponent {
     this.router.navigate(['/workers']);
   }
 
+  goToStock(): void {
+    this.router.navigate(['/stock']);
+  }
+
   statusLabel(status: string): string {
     const labels: Record<string, string> = {
       PENDING: 'Pendiente',

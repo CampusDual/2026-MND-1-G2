@@ -4,6 +4,7 @@ import com.campusdual.cd2026mnd1g1.model.exception.UserNotFoundException;
 import com.campusdual.cd2026mnd1g1.model.exception.ServiceRequestNotFoundException;
 import com.campusdual.cd2026mnd1g1.model.exception.WorkerNotFoundException;
 import com.campusdual.cd2026mnd1g1.model.exception.RequestConflictException;
+import com.campusdual.cd2026mnd1g1.model.exception.StockInsufficientException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -46,6 +47,11 @@ public class RestExceptionHandler {
 
     @ExceptionHandler(RequestConflictException.class)
     public ResponseEntity<Map<String, Object>> handleConflict(RequestConflictException exception) {
+        return buildErrorResponse(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler(StockInsufficientException.class)
+    public ResponseEntity<Map<String, Object>> handleStockInsufficient(StockInsufficientException exception) {
         return buildErrorResponse(HttpStatus.CONFLICT, exception.getMessage());
     }
 

@@ -345,7 +345,11 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          description: Solicitud ya asignada o stock insuficiente.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '500': { $ref: '#/components/responses/InternalServerError' }
   /api/worker-requests/{id}/start:
     post:
@@ -394,6 +398,21 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/stock:
+    get:
+      tags: [Stock]
+      summary: Consulta los productos de stock de solicitudes de servicio
+      responses:
+        '200':
+          description: Resumen de stock
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockSummaryDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/InternalServerError' }
 components:
   securitySchemes:
@@ -444,6 +463,20 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    StockProductDto:
+      type: object
+      required: [name, uds]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 160 }
+        uds: { type: integer, minimum: 0 }
+    StockSummaryDto:
+      type: object
+      required: [products, differentProducts]
+      properties:
+        products:
+          type: array
+          items: { $ref: '#/components/schemas/StockProductDto' }
+        differentProducts: { type: integer, minimum: 0 }
     WorkerRequestDto:
       type: object
       required: [serviceRequestId, cabinNumber, itemName, status]

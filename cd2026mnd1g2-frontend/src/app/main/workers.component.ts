@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -64,7 +65,11 @@ export class WorkersComponent {
     }
     this.requestService.assignWorkerRequest(request.serviceRequestId, this.department).subscribe({
       next: () => this.loadRequests(),
-      error: () => this.errorMessage = 'La solicitud ya no esta disponible.'
+      error: (error: HttpErrorResponse) => {
+        this.errorMessage = typeof error.error?.message === 'string'
+          ? error.error.message
+          : 'La solicitud ya no esta disponible.';
+      }
     });
   }
 
@@ -107,6 +112,10 @@ export class WorkersComponent {
 
   backToCabin(): void {
     this.router.navigate(['/it-works']);
+  }
+
+  goToStock(): void {
+    this.router.navigate(['/stock']);
   }
 
   logout(): void {
