@@ -1,18 +1,26 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { AuthService } from '../core/auth.service';
 import { RequestService, WorkerDepartment, WorkerRequest } from '../core/request.service';
+import {
+  StockMovementType,
+  StockProduct,
+  StockService,
+  StockSourceState,
+  StockSummary
+} from '../core/stock.service';
 
 /**
- * Pantalla de gestion de solicitudes asignables a trabajadores.
+ * Pantalla de gestión de tareas y operaciones de inventario de Housekeeping.
  */
 @Component({
   selector: 'app-workers',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './workers.component.html',
   styleUrl: './workers.component.scss'
 })
@@ -21,17 +29,31 @@ export class WorkersComponent {
   unassigned: WorkerRequest[] = [];
   assigned: WorkerRequest[] = [];
   resolved: WorkerRequest[] = [];
+  reusableProducts: StockProduct[] = [];
+  inventoryOperations: Partial<Record<number, StockMovementType | ''>> = {};
+  inventoryProductIds: Record<number, number | null> = {};
+  inventoryQuantities: Record<number, number> = {};
+  inventorySources: Partial<Record<number, StockSourceState>> = {};
+  inventoryReasons: Record<number, string> = {};
+  inventorySaving: Record<number, boolean> = {};
+  inventorySuccess: Record<number, string> = {};
   isLoading = false;
   errorMessage = '';
 
   constructor(
     private readonly authService: AuthService,
     private readonly router: Router,
-    private readonly requestService: RequestService
+    private readonly requestService: RequestService,
+    private readonly stockService: StockService
   ) {}
 
   enterDepartment(department: WorkerDepartment): void {
     this.department = department;
+    if (department === 'HOUSEKEEPING') {
+      this.loadReusableProducts();
+    } else {
+      this.reusableProducts = [];
+    }
     this.loadRequests();
   }
 
@@ -66,9 +88,7 @@ export class WorkersComponent {
     this.requestService.assignWorkerRequest(request.serviceRequestId, this.department).subscribe({
       next: () => this.loadRequests(),
       error: (error: HttpErrorResponse) => {
-        this.errorMessage = typeof error.error?.message === 'string'
-          ? error.error.message
-          : 'La solicitud ya no esta disponible.';
+        this.errorMessage = this.readError(error, 'La solicitud ya no está disponible.');
       }
     });
   }
@@ -79,7 +99,9 @@ export class WorkersComponent {
     }
     this.requestService.startWorkerRequest(request.serviceRequestId, this.department).subscribe({
       next: () => this.loadRequests(),
-      error: () => this.errorMessage = 'No se ha podido iniciar la solicitud.'
+      error: (error: HttpErrorResponse) => {
+        this.errorMessage = this.readError(error, 'No se ha podido iniciar la solicitud.');
+      }
     });
   }
 
@@ -89,7 +111,70 @@ export class WorkersComponent {
     }
     this.requestService.resolveWorkerRequest(request.serviceRequestId, this.department).subscribe({
       next: () => this.loadRequests(),
-      error: () => this.errorMessage = 'No se ha podido finalizar la solicitud.'
+      error: (error: HttpErrorResponse) => {
+        this.errorMessage = this.readError(error, 'No se ha podido finalizar la solicitud.');
+      }
+    });
+  }
+
+  selectInventoryOperation(requestId: number, operation: string): void {
+    if (operation === '' || operation === 'TO_LAUNDRY'
+      || operation === 'FROM_LAUNDRY' || operation === 'DISPOSAL') {
+      this.inventoryOperations[requestId] = operation;
+    }
+    this.inventorySuccess[requestId] = '';
+  }
+
+  selectInventoryProduct(requestId: number, productId: number | null): void {
+    this.inventoryProductIds[requestId] = productId;
+  }
+
+  selectInventorySource(requestId: number, source: string): void {
+    if (source === 'WAREHOUSE' || source === 'LAUNDRY') {
+      this.inventorySources[requestId] = source;
+    }
+  }
+
+  recordInventoryOperation(request: WorkerRequest): void {
+    const requestId = request.serviceRequestId;
+    if (this.inventorySaving[requestId]) {
+      return;
+    }
+    const operation = this.inventoryOperations[requestId];
+    const productId = this.inventoryProductIds[requestId];
+    const quantity = this.inventoryQuantities[requestId];
+    if (!operation || !productId || typeof quantity !== 'number'
+      || !Number.isInteger(quantity) || quantity <= 0) {
+      this.errorMessage = 'Selecciona un producto e introduce una cantidad entera positiva.';
+      return;
+    }
+    const isDisposal = operation === 'DISPOSAL';
+    const reason = this.inventoryReasons[requestId] || '';
+    if (isDisposal && !reason) {
+      this.errorMessage = 'Selecciona el motivo del desecho.';
+      return;
+    }
+
+    this.errorMessage = '';
+    this.inventorySaving[requestId] = true;
+    this.stockService.createMovement(productId, {
+      movementType: operation,
+      quantity,
+      sourceState: isDisposal ? this.inventorySources[requestId] ?? 'WAREHOUSE' : null,
+      reason: isDisposal ? reason : null,
+      idempotencyKey: crypto.randomUUID(),
+      serviceRequestId: requestId
+    }).subscribe({
+      next: () => {
+        this.inventorySaving[requestId] = false;
+        this.inventorySuccess[requestId] = 'Movimiento de inventario registrado.';
+        this.inventoryQuantities[requestId] = 1;
+        this.loadReusableProducts();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.inventorySaving[requestId] = false;
+        this.errorMessage = this.readError(error, 'No se ha podido registrar el movimiento.');
+      }
     });
   }
 
@@ -108,6 +193,7 @@ export class WorkersComponent {
     this.unassigned = [];
     this.assigned = [];
     this.resolved = [];
+    this.reusableProducts = [];
   }
 
   backToCabin(): void {
@@ -121,5 +207,20 @@ export class WorkersComponent {
   logout(): void {
     this.authService.logout();
     this.router.navigate(['/login']);
+  }
+
+  private loadReusableProducts(): void {
+    this.stockService.getStock().subscribe({
+      next: (summary: StockSummary) => {
+        this.reusableProducts = summary.products.filter((product) => product.stockType === 'REUSABLE');
+      },
+      error: (error: HttpErrorResponse) => {
+        this.errorMessage = this.readError(error, 'No se han podido cargar los productos reutilizables.');
+      }
+    });
+  }
+
+  private readError(error: HttpErrorResponse, fallback: string): string {
+    return typeof error.error?.message === 'string' ? error.error.message : fallback;
   }
 }

@@ -85,6 +85,82 @@
               }
               @if (request.status === 'IN_PROGRESS') {
                 <button type="button" class="resolve-button" (click)="resolve(request)">FINALIZAR</button>
+                @if (department === 'HOUSEKEEPING') {
+                  <section class="inventory-operation">
+                    <h4>Operación de reutilizables</h4>
+                    <label>
+                      <span>Operación</span>
+                      <select
+                        [ngModel]="inventoryOperations[request.serviceRequestId] ?? ''"
+                        (ngModelChange)="selectInventoryOperation(request.serviceRequestId, $event)"
+                        name="operation-{{ request.serviceRequestId }}">
+                        <option value="">Selecciona una operación</option>
+                        <option value="TO_LAUNDRY">Enviar a lavandería</option>
+                        <option value="FROM_LAUNDRY">Devolver de lavandería</option>
+                        <option value="DISPOSAL">Desechar</option>
+                      </select>
+                    </label>
+                    @if (inventoryOperations[request.serviceRequestId]) {
+                      <label>
+                        <span>Producto reutilizable</span>
+                        <select
+                          [ngModel]="inventoryProductIds[request.serviceRequestId] ?? null"
+                          (ngModelChange)="selectInventoryProduct(request.serviceRequestId, $event)"
+                          name="product-{{ request.serviceRequestId }}">
+                          <option [ngValue]="null">Selecciona un producto</option>
+                          @for (product of reusableProducts; track product.productId) {
+                            <option [ngValue]="product.productId">
+                              {{ product.name }} · almacén {{ product.warehouseUnits }} · lavandería {{ product.laundryUnits }}
+                            </option>
+                          }
+                        </select>
+                      </label>
+                      <label>
+                        <span>Unidades</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          [(ngModel)]="inventoryQuantities[request.serviceRequestId]"
+                          name="quantity-{{ request.serviceRequestId }}">
+                      </label>
+                      @if (inventoryOperations[request.serviceRequestId] === 'DISPOSAL') {
+                        <label>
+                          <span>Procedencia</span>
+                          <select
+                            [ngModel]="inventorySources[request.serviceRequestId] ?? 'WAREHOUSE'"
+                            (ngModelChange)="selectInventorySource(request.serviceRequestId, $event)"
+                            name="source-{{ request.serviceRequestId }}">
+                            <option value="WAREHOUSE">En almacén</option>
+                            <option value="LAUNDRY">En lavandería</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span>Motivo</span>
+                          <select
+                            [(ngModel)]="inventoryReasons[request.serviceRequestId]"
+                            name="reason-{{ request.serviceRequestId }}">
+                            <option value="">Selecciona un motivo</option>
+                            <option value="Deteriorado">Deteriorado</option>
+                            <option value="Roto">Roto</option>
+                            <option value="Perdido">Perdido</option>
+                            <option value="Otro">Otro</option>
+                          </select>
+                        </label>
+                      }
+                      <button
+                        type="button"
+                        class="inventory-button"
+                        [disabled]="inventorySaving[request.serviceRequestId]"
+                        (click)="recordInventoryOperation(request)">
+                        {{ inventorySaving[request.serviceRequestId] ? 'REGISTRANDO...' : 'REGISTRAR MOVIMIENTO' }}
+                      </button>
+                    }
+                    @if (inventorySuccess[request.serviceRequestId]) {
+                      <p class="inventory-success" role="status">{{ inventorySuccess[request.serviceRequestId] }}</p>
+                    }
+                  </section>
+                }
               }
             </article>
           }

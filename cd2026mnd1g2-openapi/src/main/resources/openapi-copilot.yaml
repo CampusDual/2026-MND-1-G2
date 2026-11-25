@@ -379,6 +379,7 @@ paths:
     post:
       tags: [Workers]
       summary: Finaliza una solicitud en curso
+      description: Al resolver una solicitud vinculada a un consumible, descuenta su cantidad una sola vez; los reutilizables se gestionan mediante movimientos explícitos.
       parameters:
         - in: path
           name: id
@@ -402,10 +403,10 @@ paths:
   /api/stock:
     get:
       tags: [Stock]
-      summary: Consulta los productos de stock de solicitudes de servicio
+      summary: Consulta el inventario activo y sus contadores por estado
       responses:
         '200':
-          description: Resumen de stock
+          description: Inventario y resumen calculados desde las cantidades persistidas
           content:
             application/json:
               schema: { $ref: '#/components/schemas/StockSummaryDto' }
@@ -413,6 +414,114 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [Stock]
+      summary: Crea un producto y registra su inventario inicial
+      operationId: createStockProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StockCreateRequestDto' }
+      responses:
+        '201':
+          description: Producto creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockProductDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/stock/{productId}:
+    parameters:
+      - in: path
+        name: productId
+        required: true
+        description: Identificador del producto.
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+    put:
+      tags: [Stock]
+      summary: Actualiza los datos descriptivos y el mínimo de un producto
+      operationId: updateStockProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StockUpdateRequestDto' }
+      responses:
+        '200':
+          description: Producto actualizado sin alterar las cantidades
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockProductDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/stock/{productId}/movements:
+    parameters:
+      - in: path
+        name: productId
+        required: true
+        description: Identificador del producto.
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+    get:
+      tags: [Stock]
+      summary: Consulta el historial de movimientos de un producto
+      operationId: listStockMovements
+      responses:
+        '200':
+          description: Movimientos ordenados desde el más reciente
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/StockMovementDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [Stock]
+      summary: Registra una entrada, movimiento de lavandería o desecho
+      operationId: createStockMovement
+      description: Puede asociarse a una tarea de Housekeeping en curso para registrar al trabajador responsable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StockMovementCreateRequestDto' }
+      responses:
+        '201':
+          description: Movimiento registrado de forma transaccional e idempotente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockMovementDto' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
         '500': { $ref: '#/components/responses/InternalServerError' }
 components:
   securitySchemes:
@@ -465,18 +574,107 @@ components:
   schemas:
     StockProductDto:
       type: object
-      required: [name, uds]
+      required:
+        - productId
+        - name
+        - stockType
+        - uds
+        - warehouseUnits
+        - laundryUnits
+        - minimumStock
+        - status
+        - active
       properties:
+        productId: { type: integer, format: int64, minimum: 1 }
         name: { type: string, minLength: 1, maxLength: 160 }
         uds: { type: integer, minimum: 0 }
+        description: { type: string, maxLength: 255, nullable: true }
+        stockType: { type: string, enum: [CONSUMABLE, REUSABLE] }
+        warehouseUnits: { type: integer, minimum: 0 }
+        laundryUnits: { type: integer, minimum: 0 }
+        minimumStock: { type: integer, minimum: 0 }
+        status: { type: string, enum: [CORRECT, REORDER_SOON, REORDER] }
+        subcategoryId: { type: integer, format: int64, minimum: 1, nullable: true }
+        subcategoryName: { type: string, nullable: true }
+        active: { type: boolean }
     StockSummaryDto:
       type: object
-      required: [products, differentProducts]
+      required:
+        - products
+        - differentProducts
+        - correctProducts
+        - reorderSoonProducts
+        - reorderProducts
       properties:
         products:
           type: array
           items: { $ref: '#/components/schemas/StockProductDto' }
         differentProducts: { type: integer, minimum: 0 }
+        correctProducts: { type: integer, minimum: 0 }
+        reorderSoonProducts: { type: integer, minimum: 0 }
+        reorderProducts: { type: integer, minimum: 0 }
+    StockCreateRequestDto:
+      type: object
+      required: [name, stockType, initialUnits, minimumStock, idempotencyKey]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 160 }
+        stockType: { type: string, enum: [CONSUMABLE, REUSABLE] }
+        initialUnits: { type: integer, minimum: 0 }
+        minimumStock: { type: integer, minimum: 0 }
+        description: { type: string, maxLength: 255, nullable: true }
+        subcategoryId: { type: integer, format: int64, minimum: 1, nullable: true }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 160 }
+    StockUpdateRequestDto:
+      type: object
+      required: [name, minimumStock]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 160 }
+        description: { type: string, maxLength: 255, nullable: true }
+        minimumStock: { type: integer, minimum: 0 }
+    StockMovementCreateRequestDto:
+      type: object
+      required: [movementType, quantity, idempotencyKey]
+      properties:
+        movementType: { type: string, enum: [STOCK_ENTRY, TO_LAUNDRY, FROM_LAUNDRY, DISPOSAL] }
+        quantity: { type: integer, minimum: 1 }
+        sourceState: { type: string, enum: [WAREHOUSE, LAUNDRY], nullable: true }
+        reason: { type: string, minLength: 1, maxLength: 255, nullable: true }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 160 }
+        serviceRequestId: { type: integer, format: int64, minimum: 1, nullable: true }
+    StockMovementDto:
+      type: object
+      required:
+        - movementId
+        - productId
+        - productName
+        - movementType
+        - quantity
+        - createdAt
+        - actorUsername
+        - previousWarehouse
+        - previousLaundry
+        - previousTotal
+        - nextWarehouse
+        - nextLaundry
+        - nextTotal
+      properties:
+        movementId: { type: integer, format: int64, minimum: 1 }
+        productId: { type: integer, format: int64, minimum: 1 }
+        productName: { type: string }
+        movementType: { type: string, enum: [STOCK_ENTRY, CONSUMPTION, TO_LAUNDRY, FROM_LAUNDRY, DISPOSAL] }
+        quantity: { type: integer, minimum: 1 }
+        sourceState: { type: string, enum: [WAREHOUSE, LAUNDRY], nullable: true }
+        reason: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        actorUsername: { type: string, minLength: 1, maxLength: 120 }
+        workerId: { type: integer, format: int64, minimum: 1, nullable: true }
+        serviceRequestId: { type: integer, format: int64, minimum: 1, nullable: true }
+        previousWarehouse: { type: integer, minimum: 0 }
+        previousLaundry: { type: integer, minimum: 0 }
+        previousTotal: { type: integer, minimum: 0 }
+        nextWarehouse: { type: integer, minimum: 0 }
+        nextLaundry: { type: integer, minimum: 0 }
+        nextTotal: { type: integer, minimum: 0 }
     WorkerRequestDto:
       type: object
       required: [serviceRequestId, cabinNumber, itemName, status]

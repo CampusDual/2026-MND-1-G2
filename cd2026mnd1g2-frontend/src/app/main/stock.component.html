@@ -11,14 +11,187 @@
   </header>
 
   <section class="stock-content">
-    <h1>Stock</h1>
+    <div class="page-heading">
+      <div>
+        <h1>Stock</h1>
+        <p>Inventario de Housekeeping actualizado desde la base de datos.</p>
+      </div>
+      <button type="button" class="primary-button" (click)="startCreate()">Nuevo producto</button>
+    </div>
 
-    @if (errorMessage) { <p class="error-message">{{ errorMessage }}</p> }
+    @if (errorMessage) { <p class="message error-message" role="alert">{{ errorMessage }}</p> }
+    @if (successMessage) { <p class="message success-message" role="status">{{ successMessage }}</p> }
 
-    <article class="summary-card">
-      <span>Productos diferentes</span>
-      <strong>{{ differentProducts }}</strong>
-    </article>
+    @if (summary) {
+      <section class="summary-grid" aria-label="Resumen de stock">
+        <article class="summary-card correct">
+          <span>Correcto</span>
+          <strong>{{ summary.correctProducts }}</strong>
+          <small>productos</small>
+        </article>
+        <article class="summary-card soon">
+          <span>Reponer pronto</span>
+          <strong>{{ summary.reorderSoonProducts }}</strong>
+          <small>productos</small>
+        </article>
+        <article class="summary-card reorder">
+          <span>Reponer</span>
+          <strong>{{ summary.reorderProducts }}</strong>
+          <small>productos</small>
+        </article>
+      </section>
+    }
+
+    <section class="filters" aria-label="Buscar y filtrar productos">
+      <label class="search-field">
+        <span>Buscar producto</span>
+        <input type="search" [(ngModel)]="searchTerm" placeholder="Nombre del producto">
+      </label>
+      <label>
+        <span>Tipo</span>
+        <select [(ngModel)]="typeFilter">
+          <option value="ALL">Todos</option>
+          <option value="CONSUMABLE">Consumible</option>
+          <option value="REUSABLE">Reutilizable</option>
+        </select>
+      </label>
+      <label>
+        <span>Estado</span>
+        <select [(ngModel)]="statusFilter">
+          <option value="ALL">Todos</option>
+          <option value="CORRECT">Correcto</option>
+          <option value="REORDER_SOON">Reponer pronto</option>
+          <option value="REORDER">Reponer</option>
+        </select>
+      </label>
+      <label class="attention-filter">
+        <input type="checkbox" [(ngModel)]="attentionOnly">
+        <span>Requieren atención</span>
+      </label>
+    </section>
+
+    @if (showEditor) {
+      <section class="panel editor-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>{{ editingProduct ? 'Editar producto' : 'Crear producto' }}</h2>
+            <p>Los cambios descriptivos no alteran las cantidades del inventario.</p>
+          </div>
+          <button type="button" class="close-button" (click)="closeEditor()" aria-label="Cerrar">×</button>
+        </div>
+        <form (ngSubmit)="saveProduct()">
+          <div class="form-grid">
+            <label>
+              <span>Nombre</span>
+              <input name="name" [(ngModel)]="formName" maxlength="160" required>
+            </label>
+            <label>
+              <span>Tipo de producto</span>
+              @if (editingProduct) {
+                <input [value]="typeLabel(editingProduct.stockType)" readonly>
+                <small class="field-error">El tipo se conserva para proteger el historial de movimientos.</small>
+              } @else {
+                <select name="stockType" [(ngModel)]="formType" required>
+                  <option value="CONSUMABLE">Consumible</option>
+                  <option value="REUSABLE">Reutilizable</option>
+                </select>
+              }
+            </label>
+            @if (!editingProduct) {
+              <label>
+                <span>Stock inicial</span>
+                <input type="number" name="initialUnits" [(ngModel)]="formInitialUnits" min="0" step="1" required>
+              </label>
+            }
+            <label>
+              <span>Stock mínimo</span>
+              <input type="number" name="minimumStock" [(ngModel)]="formMinimumStock" min="0" step="1" required>
+            </label>
+            @if (!editingProduct) {
+              <label>
+                <span>Subcategoría de servicio (opcional)</span>
+                <select name="subcategory" [(ngModel)]="formSubcategoryId">
+                  <option [ngValue]="null">Sin vincular</option>
+                  @for (subcategory of subcategories; track subcategory.subcategoryId) {
+                    <option [ngValue]="subcategory.subcategoryId">{{ subcategory.name }}</option>
+                  }
+                </select>
+                @if (subcategoryError) { <small class="field-error">{{ subcategoryError }}</small> }
+              </label>
+            }
+            <label class="wide-field">
+              <span>Descripción (opcional)</span>
+              <textarea name="description" [(ngModel)]="formDescription" maxlength="255" rows="2"></textarea>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="secondary-button" (click)="closeEditor()">Cancelar</button>
+            <button type="submit" class="primary-button" [disabled]="isSaving">
+              {{ isSaving ? 'Guardando...' : 'Guardar producto' }}
+            </button>
+          </div>
+        </form>
+      </section>
+    }
+
+    @if (selectedProduct) {
+      <section class="panel detail-panel">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">{{ typeLabel(selectedProduct.stockType) }}</span>
+            <h2>{{ selectedProduct.name }}</h2>
+            @if (selectedProduct.description) { <p>{{ selectedProduct.description }}</p> }
+          </div>
+          <div class="detail-actions">
+            <button type="button" class="secondary-button" (click)="editProduct(selectedProduct)">Editar</button>
+            <button type="button" class="close-button" (click)="closeDetails()" aria-label="Cerrar">×</button>
+          </div>
+        </div>
+
+        <div class="detail-grid">
+          <div>
+            <h3>Registrar entrada de stock</h3>
+            <p>Las unidades se añadirán al almacén; la operación quedará en el historial.</p>
+            <form class="entry-form" (ngSubmit)="registerEntry()">
+              <label>
+                <span>Unidades recibidas</span>
+                <input type="number" name="entryQuantity" [(ngModel)]="entryQuantity" min="1" step="1" required>
+              </label>
+              <button type="submit" class="primary-button" [disabled]="isRegisteringEntry">
+                {{ isRegisteringEntry ? 'Registrando...' : 'Registrar entrada' }}
+              </button>
+            </form>
+          </div>
+          <div>
+            <h3>Historial de movimientos</h3>
+            @if (movements.length === 0) {
+              <p class="empty">Todavía no hay movimientos registrados.</p>
+            } @else {
+              <div class="movement-list">
+                @for (movement of movements; track movement.movementId) {
+                  <article class="movement-row">
+                    <div class="movement-title">
+                      <strong>{{ movementLabel(movement.movementType) }}</strong>
+                      <span>{{ movement.quantity }} uds.</span>
+                    </div>
+                    <small>{{ movement.createdAt | date:'short' }} · {{ movement.actorUsername }}</small>
+                    <small>
+                      Antes {{ movement.previousWarehouse }} almacén / {{ movement.previousLaundry }} lavandería /
+                      {{ movement.previousTotal }} total
+                    </small>
+                    <small>
+                      Después {{ movement.nextWarehouse }} almacén / {{ movement.nextLaundry }} lavandería /
+                      {{ movement.nextTotal }} total
+                    </small>
+                    @if (movement.reason) { <small>Motivo: {{ movement.reason }}</small> }
+                  </article>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+    }
 
     @if (isLoading) { <p class="loading">Cargando stock...</p> }
 
@@ -28,19 +201,43 @@
           <thead>
             <tr>
               <th>Producto</th>
-              <th>Unidades disponibles</th>
+              <th>Tipo</th>
+              <th>En almacén</th>
+              <th>En lavandería</th>
+              <th>Total</th>
+              <th>Stock mínimo</th>
+              <th>Estado</th>
             </tr>
           </thead>
           <tbody>
-            @for (product of products; track product.name) {
+            @for (product of filteredProducts; track product.productId) {
               <tr>
-                <td>{{ product.name }}</td>
-                <td>{{ product.uds }}</td>
+                <td>
+                  <button type="button" class="product-link" (click)="openDetails(product)">
+                    {{ product.name }}
+                  </button>
+                </td>
+                <td>{{ typeLabel(product.stockType) }}</td>
+                <td>{{ product.warehouseUnits }}</td>
+                <td>{{ product.stockType === 'CONSUMABLE' ? '—' : product.laundryUnits }}</td>
+                <td class="numeric-cell">{{ product.uds }}</td>
+                <td>{{ product.minimumStock }}</td>
+                <td>
+                  <span
+                    class="status-badge"
+                    [class.correct]="product.status === 'CORRECT'"
+                    [class.reorder-soon]="product.status === 'REORDER_SOON'"
+                    [class.reorder]="product.status === 'REORDER'">
+                    {{ statusLabel(product.status) }}
+                  </span>
+                </td>
               </tr>
             }
           </tbody>
         </table>
-        @if (products.length === 0) { <p class="empty">No hay productos en stock</p> }
+        @if (filteredProducts.length === 0) {
+          <p class="empty">No hay productos que coincidan con los filtros.</p>
+        }
       </div>
     }
   </section>

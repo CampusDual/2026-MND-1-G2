@@ -6,14 +6,13 @@ import com.campusdual.cd2026mnd1g1.model.entity.*;
 import com.campusdual.cd2026mnd1g1.model.exception.ServiceRequestNotFoundException;
 import com.campusdual.cd2026mnd1g1.model.exception.WorkerNotFoundException;
 import com.campusdual.cd2026mnd1g1.model.exception.RequestConflictException;
-import com.campusdual.cd2026mnd1g1.model.exception.StockInsufficientException;
 import com.campusdual.cd2026mnd1g1.model.repository.*;
+import com.campusdual.cd2026mnd1g1.api.service.StockService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
 @Service
 @Transactional
@@ -26,17 +25,17 @@ public class RequestServiceImpl implements RequestService {
     private final RequestSubcategoryRepository subcategoryRepository;
     private final ServiceRequestRepository requestRepository;
     private final WorkerRepository workerRepository;
-    private final StockRepository stockRepository;
+    private final StockService stockService;
 
     public RequestServiceImpl(CabinRepository cabinRepository, RequestCategoryRepository categoryRepository,
                               RequestSubcategoryRepository subcategoryRepository, ServiceRequestRepository requestRepository,
-                              WorkerRepository workerRepository, StockRepository stockRepository) {
+                              WorkerRepository workerRepository, StockService stockService) {
         this.cabinRepository = cabinRepository;
         this.categoryRepository = categoryRepository;
         this.subcategoryRepository = subcategoryRepository;
         this.requestRepository = requestRepository;
         this.workerRepository = workerRepository;
-        this.stockRepository = stockRepository;
+        this.stockService = stockService;
     }
 
     @Override
@@ -130,7 +129,6 @@ public class RequestServiceImpl implements RequestService {
         if (!PENDING.equals(request.getStatus()) || request.getWorker() != null) {
             throw new RequestConflictException("La solicitud ya ha sido asignada o no esta pendiente");
         }
-        decrementStockForAssignment(request);
         request.setWorker(worker);
         transition(request, ASSIGNED);
         return mapWorkerRequest(requestRepository.save(request));
@@ -162,6 +160,11 @@ public class RequestServiceImpl implements RequestService {
         if (!"IN_PROGRESS".equals(request.getStatus())) {
             throw new RequestConflictException("La solicitud debe estar en curso antes de finalizarse");
         }
+        stockService.recordRequestConsumption(
+                request.getSubcategory().getSubcategoryId(),
+                request.getQuantity(),
+                request.getServiceRequestId(),
+                username);
         transition(request, "RESOLVED");
         return mapWorkerRequest(requestRepository.save(request));
     }
@@ -185,27 +188,6 @@ public class RequestServiceImpl implements RequestService {
         request.setUpdatedAt(now);
     }
 
-    private void decrementStockForAssignment(ServiceRequestEntity request) {
-        if (request.getQuantity() == null || request.getQuantity() < 1) {
-            return;
-        }
-
-        Long subcategoryId = request.getSubcategory().getSubcategoryId();
-        Optional<StockEntity> stock =
-                stockRepository.findBySubcategorySubcategoryIdForUpdate(subcategoryId);
-        if (stock.isEmpty()) {
-            return;
-        }
-
-        StockEntity product = stock.get();
-        int available = product.getUds();
-        if (available < request.getQuantity()) {
-            throw new StockInsufficientException(
-                    product.getName(), available, request.getQuantity());
-        }
-        product.setUds(available - request.getQuantity());
-        stockRepository.save(product);
-    }
     private RequestSubcategoryDto mapSubcategory(RequestSubcategoryEntity subcategory) {
         return new RequestSubcategoryDto(subcategory.getSubcategoryId(), subcategory.getCategory().getCategoryId(),
                 subcategory.getName(), subcategory.getDescription(), subcategory.getIcon(), subcategory.getActive());

@@ -31,6 +31,18 @@ public interface StockRepository extends JpaRepository<StockEntity, Long> {
 
     Optional<StockEntity> findBySubcategorySubcategoryId(Long subcategoryId);
 
+    List<StockEntity> findAllByActiveTrueOrderByNameAsc();
+
+    boolean existsByNameIgnoreCase(String name);
+
+    boolean existsByNameIgnoreCaseAndProductIdNot(String name, Long productId);
+
+    Optional<StockEntity> findByCreationKey(String creationKey);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT stock FROM StockEntity stock WHERE stock.productId = :productId")
+    Optional<StockEntity> findByIdForUpdate(@Param("productId") Long productId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT stock FROM StockEntity stock
